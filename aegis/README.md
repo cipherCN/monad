@@ -7,7 +7,7 @@
 > 用自己的代码独立重推导同一结论（L1–L5 五层），2-of-2 一致才放行执行。任何人在 Monad 链上即可独立验证。
 
 对应策略文档 `../第四版策略.md`。
-**状态：26/26 单测 + challenger selftest 17/17 + parity 17/17 + 全链路 Monad testnet 实测（见"已验证里程碑"）。**
+**状态：41/41 单测 + challenger selftest 17/17 + parity 17/17 + 全链路 Monad testnet 实测（见"已验证里程碑"）。**
 
 ## 信任边界（务必照此口径讲）
 
@@ -84,9 +84,9 @@ dashboard/                     Next.js 14 统一入口（评审动线：总览 �
 | — | **ERC-8004 三注册表**（自部署） | agentId=1 注册 + 验证闭环(response=100) + 声誉(getSummary=100) |
 | D6 | **负例测试**（9+ 项攻击向量） | 全部被拒；坏 quote 位置扫描 11/13 捕获（2 MISS 均在证书尾部惰性 padding，非签名覆盖区） |
 | P1 | **Challenger 独立性包** | 4 层独立重推导（现已扩展到 5 层 / 17 用例）+ 决策原文存证 + fail-closed；角色分离：proposer 不代签 validation |
-| P2 | **合约 v2 + quote 路径上线** | ReceiptRegistry v2（bindTranscript）+ AegisVaultQuorum v2（executeTrade 带 value）；Phala CVM quote 实时生成 → 链上 DCAP 验真 |
+| P2 | **合约 v2 + quote 路径上线** | ReceiptRegistry v2（bindTranscript）+ AegisVaultQuorum v2（executeTrade 由金库自有余额出资）；Phala CVM quote 实时生成 → 链上 DCAP 验真 |
 | P3 | **双 LLM 隔离管线 + 跨家族** | 隔离 LLM（无工具）→ 特权 LLM（只吃可信指令+摘要）→ δ 裁决；proposer=deepseek-flash / challenger=glm-5.3-flash（**经网关指纹实测确认不同后端**，见 `scripts/probe-gateway.mjs`；**该端点已于 2026-09-15 删除，交叉模型层现需另配端点**）；parity-check 守住两侧口径 |
-| P4 | **真实协议交互路径** | 官方 canonical WMON wrap：LLM intent → `deposit()` calldata → executeTrade{value} → 金库 WMON 0→0.01（四笔 tx 全链实测，见下） |
+| P4 | **真实协议交互路径** | 官方 canonical WMON wrap：LLM intent → `deposit()` calldata → executeTrade（金库余额出资）→ 金库 WMON 0→0.01（四笔 tx 全链实测，见下） |
 | P6 | **统一入口 Dashboard** | 评审动线四页 + `/orch/*` 同源代理 + 一键负例（11 向量实测全过）+ 11 个负例浏览器内断言 |
 | P7 | **SOA-lite 签署目标层（L5）** | 用户 EIP-191 签署客观目标（金额区间/标的/期限/nonce，不签动作）→ 两侧零共享代码独立验签 + ε-最优检查 → `objectiveHash` 经 `bindTranscript` 上链存证；意图漂移/篡改/过期/超签署上限全部被拒；**链上 E2E 已实测 5/5**（见下，`scripts/soa-demo.mjs --onchain`、`selftest 17/17`、`parity 17/17`） |
 | — | **攻击族四格 + 代价曲线实验** | 四类攻击者（R1 代换 / 策略后门 / 意图漂移 / 混淆代理）完整验证链实测 7/8 拦下（1 项 = 输入真实性不可能性，设计边界）；L1–L5 全链重推导 ≈2.1–2.7 ms/次（三次实测区间；`scripts/attack-family.mjs`、`scripts/regime-cost.mjs`） |
@@ -112,11 +112,26 @@ dashboard/                     Next.js 14 统一入口（评审动线：总览 �
 | receipt digest | `0x85f52983349cac66b0591917a8b4e986abb73c4633976ee9f1675fd5ce3dc740` |
 | `TranscriptBound` uri（= 签署的 objectiveHash） | `aegis://objective/0x7d3789c5e4e9be100fa4f8a621cd587c11d1d4a8062544496ecf56cc21e51648` |
 | challenger 重推导（L1–L5 全过）→ validationResponse=100 | `0x0cd3f6a9a63e3130308b0e4ecd8cd6aad51f2111146ce4c47ac76701f8d2e60e` |
-| executeTrade{value}（真实 WMON wrap） | `0x03a754cf73610a2350a5658e4a1fc90909ca8afbe585bdb9f90f767b81a5f388` @62756812 |
+| executeTrade（真实 WMON wrap） | `0x03a754cf73610a2350a5658e4a1fc90909ca8afbe585bdb9f90f767b81a5f388` @62756812 |
 | 链上结果 | TradeExecuted target=WMON amount=1e16，**执行落在用户签署目标内（L5 重推导确认）**；金库 WMON 0.01 → 0.02 |
 | 三负例（链前拒，零 gas） | 漂移 `objective_exceeds_max`+`objective_not_eps_optimal:dev=1e16` / 篡改 `objective_bad_signature` / 过期 `objective_expired` |
 
 > 本次实跑暴露并修复 3 个真实 bug：① deepseek-flash 为推理模型，max_tokens 预算被 reasoning 吃光 → 空 content → fail-closed 误拒（统一 `LLM_MAX_TOKENS=2000`）；② `tx.wait()` 后读 `lastReceiptHash` 命中滞后 RPC 后端 → bindTranscript 用旧 digest 估价 revert（改为客户端预算 expectedDigest + 轮询对齐）；③ orchestrator HTTP 异常静默无日志（现 catch-all 打印）。
+
+### v4 全链 E2E 复跑（buy WMON 0.01，2026-09-17，当前生产地址）
+
+上面两个 E2E 走的是 v2/v3 时代地址（已废弃，保留作历史）。**当前生产地址 `AegisVaultQuorum 0x07Be2FCd…B65bc`（v4：验证者白名单 + 交易槽钩子）的复跑结果**：
+
+| 步骤 | tx / 结果 |
+|---|---|
+| 金库 `deposit()` 注资 | `0x92e6e5425dcc2281f92c7a2223517f6a83da79a4f5a0c4cea63c89d7e4c179c4`（gas 23,349），金库 MON 0 → 0.5 |
+| 收据提交（`submitReceiptWithQuote`，链上 DCAP 验真） | `0xf9e49b5b22b878e3f225180d2ada035b516389a4d12694849cfc7a4d174d8d7b`，digest `0x02adf665…08f266` |
+| challenger 独立重推导（L1–L4 全过） | `agree: true` / `response: 100`，四层 `1_policy`/`2_guardrail`/`3_pace`/`4_arithmetic` 无 mismatch |
+| validationRequest + validationResponse | `0xd82088d7…2e41f1` / `0x645612df…b03c7`（status 1） |
+| executeTrade（金库余额出资） | `0x42048bec27b97c3c640cf21e701a2a87e23f1f7d313c765bd3990852b4b76b05`（gas 183,604），`execution.status: "executed"` |
+| 链上结果 | 金库 **WMON 0 → 0.010000**，MON **0.5 → 0.49** |
+
+> 该笔在真实执行路径上验证了两项 v4 合约层修复：验证者白名单（`isTrustedValidator`，未授权一律 revert）与交易槽钩子（读 `lastTradeReceipt`，心跳不再顶掉在途交易）。
 
 ### Tenderly 公开证据（匿名可查，评委直接核验）
 
@@ -124,7 +139,7 @@ dashboard/                     Next.js 14 统一入口（评审动线：总览 �
 
 | 合约 | Tenderly 合约页（无需登录） |
 |---|---|
-| AegisVaultQuorum `0xe6E24BB7…533D7` | https://dashboard.tenderly.co/contract/monad-testnet/0xe6E24BB72a4a327b7A7E7aA025A04eBc5a6533D7 |
+| AegisVaultQuorum `0x07Be2FCd…B65bc`（v4） | https://dashboard.tenderly.co/contract/monad-testnet/0x07Be2FCdAA649F11177AaCCbd68A5bFF36aB65bc |
 | ReceiptRegistry `0x4622D041…9c90B` | https://dashboard.tenderly.co/contract/monad-testnet/0x4622D041696942dC873a8A5E54f1e1ca9669c90B |
 | DcapGate `0xAe58A4F6…fc66F` | https://dashboard.tenderly.co/contract/monad-testnet/0xAe58A4F6DD3E2810812193D4766f11d5F3Dfc66F |
 | ValidationRegistry `0x8b96a09e…be0cEa` | https://dashboard.tenderly.co/contract/monad-testnet/0x8b96a09eb50409FE4c402cB9Bb9D1Ef79bbe0cEa |
@@ -142,16 +157,24 @@ dashboard/                     Next.js 14 统一入口（评审动线：总览 �
 匿名可查性实测（无任何凭据、无重定向到登录页）：
 
 ```bash
-curl -s https://api.tenderly.co/api/v1/public-contracts/10143/0xe6e24bb72a4a327b7a7e7aa025a04ebc5a6533d7
-# => "public":true, "contract_name":"AegisVaultQuorum",
+curl -s https://api.tenderly.co/api/v1/public-contracts/10143/0x07Be2FCdAA649F11177AaCCbd68A5bFF36aB65bc
+# => "public":true, "contract_name":"AegisVaultQuorum", "type":"contract",
+#    "verification_date":"2026-09-16T16:56:40Z", "compiler_version":"v0.8.24", "evm_version":"paris",
 #    compiler_settings{"optimizer":{"enabled":true,"runs":200},"evmVersion":"paris","viaIR":true}
 # 上表 6 个地址同构可查（把末尾地址换成任意一个即可复测）
 ```
 
-重新部署/新增合约后可重生成上传件并复核（流程 2026-09-15 实操）：
+> v4 于 2026-09-16 完成源码级公开验证（`verification_date` 16:56:40 UTC）。上传前先用
+> `node scripts/tenderly-prep.mjs` 做本地重编译 → 链上 runtime 逐字节 diff：v4 有 166 个字节差异，
+> 全部落在 8 个 20 字节 address immutable 槽 + 6 个 1 字节标志位（构造期写入），0 个无法归类的簇 →
+> 源码完全匹配。注意该脚本的 `MISMATCH` 阈值是 128 字节，对 v4 这种 immutable 较多的合约会**误报**，
+> 需按"差异是否全部可归类为 immutable"来判断，而非只看阈值。
+
+重新部署/新增合约后可重生成上传件并复核（流程 2026-09-15 首次实操 / 2026-09-16 用于 v4）：
 
 1. 入口：合约页 `https://dashboard.tenderly.co/contract/monad-testnet/<地址>` → **Source code** → **Verify Contract**（无需 tx 调试器）
 2. Visibility 选 **Public** → Source Code 选 **JSON Upload** → 粘贴下面的 standard JSON → Review 勾选目标合约 → Compiler Version 选 `solc v0.8.24` → Finish
+3. 注：Optimizer / Optimization Count / EVM Version / ViaIR 会从 JSON 的 `settings` 自动带出，但 **Compiler Version 必须手选**（不会自动带出）
 
 ```bash
 node scripts/tenderly-prep.mjs artifacts/build-info/<buildInfo>.json <ContractName> <0xAddr> --dump out.json
@@ -165,14 +188,14 @@ Uniswap v2/v3/v4 全系 canonical 地址链上实测 `codeLen=0`（`scripts/prob
 Kuru 等生态部署无法核实。官方文档 canonical 的 WMON
 （`0xFb8bf4c1CC7a94c73D209a149eA2AbEa852BC541`，链上核实 name/symbol/decimals）是当前唯一可核实的
 第三方协议交互目标。**wrap 是任何真实 swap 的第一步**（MON→WMON→token）；接第三方 DEX 只差一个
-已验证流动性的 router，路径其余部分（intent→calldata→PACE→收据→互证→executeTrade{value}）已全部打通。
+已验证流动性的 router，路径其余部分（intent→calldata→PACE→收据→互证→executeTrade）已全部打通。
 
 ## 运行
 
 ```powershell
 npm install
 npx hardhat compile   # evm target: paris（MCOPY 坑）
-npx hardhat test      # 26/26
+npx hardhat test      # 41/41
 
 # Challenger（独立进程；部署到另一台机器即成真 2-of-2，见 challenger/README.md）
 node challenger/challenger-agent.mjs          # 常驻轮询
@@ -205,7 +228,7 @@ cd ../dashboard && npm install && npm run build && npm start
 # 浏览器：/ → 现场跑一笔 /try → 独立验证器 /verify → 架构与信任边界 /architecture → 收据流 /receipts
 ```
 
-## 安全属性（合约层，26/26 测试覆盖）
+## 安全属性（合约层，41/41 测试覆盖）
 
 | 属性 | 位置 |
 |---|---|
@@ -294,9 +317,10 @@ standing authorization 的 replay 防护由 nonce + deadline 收敛，链上防�
 | ERC-8004 IdentityRegistry（自部署） | `0xC99D2957fdA1455E68dF2181A4bB97fd73081A74` |
 | ERC-8004 ReputationRegistry（自部署） | `0xb5B853BcE92940b8E5BFba131301509eaCFb5c9f` |
 | ERC-8004 ValidationRegistry（自部署） | `0x8b96a09eb50409FE4c402cB9Bb9D1Ef79bbe0cEa` |
-| **AegisVaultQuorum（v2：executeTrade 带 value）** | `0xe6E24BB72a4a327b7A7E7aA025A04eBc5a6533D7` |
+| **AegisVaultQuorum（v4：验证者白名单 + 交易槽钩子）** | `0x07Be2FCdAA649F11177AaCCbd68A5bFF36aB65bc` |
 | WMON（官方 canonical，P4 目标） | `0xFb8bf4c1CC7a94c73D209a149eA2AbEa852BC541` |
 
 其余（DCAP 全栈 14+ 合约、历史 tx 哈希与 gas）见 `dcap-verifier/STATUS.md`。
 其中全部 6 个自部署核心合约（AegisVaultQuorum / ReceiptRegistry / DcapGate / ValidationRegistry / IdentityRegistry / ReputationRegistry）已在 Tenderly 源码级公开验证（证据链接见上方「Tenderly 公开证据」）。
 旧 v1 地址（ReceiptRegistry `0x91482e67…`、Vault `0x60F9F1FB…`）已废弃，勿引用。
+`AegisVaultQuorum` 历史版本：v2 `0xe6E24BB7…533D7`（缺验证者白名单——`ValidationRegistry` 无需许可，可自证自答伪造 quorum）、v3 `0x3e5dDe45…3eBa19`（有白名单但钩子读链头，心跳顶掉链头后 executeTrade 全 revert），两者均已废弃。

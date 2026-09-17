@@ -698,6 +698,10 @@ const server = http.createServer(async (req, res) => {
     send(404, { error: "not found" });
   } catch (e) {
     console.error("[orchestrator] request error:", e?.shortMessage || e?.message || e);
+    if (e?.errors) for (const sub of e.errors) console.error("  [provider]", sub?.provider?.url || sub?.provider || "?", "→", sub?.error?.shortMessage || sub?.error?.message || sub?.error || sub);
+    if (e?.info) console.error("  [info]", JSON.stringify(e.info)?.slice(0, 1200));
+    if (e?.cause) console.error("  [cause]", e.cause?.shortMessage || e.cause?.message || String(e.cause));
+    console.error("  [stack]", String(e?.stack || "").split("\n").slice(0, 6).join("\n"));
     send(500, { error: String(e?.shortMessage || e?.message || e) });
   }
 });

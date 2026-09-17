@@ -29,10 +29,10 @@ The short version:
 ```bash
 cd aegis
 npm install
-npx hardhat test                   # 40/40, no gas
+npx hardhat test                   # 41/41, no gas
 node challenger/selftest.mjs       # 17/17
 node scripts/parity-check.mjs      # 17/17
-node scripts/attack-family.mjs     # 7 blocked / 8 as-expected
+node scripts/attack-family.mjs     # 7 blocked / 1 accepted-as-designed
 ```
 
 All on-chain evidence referenced by the paper is verifiable in a browser with no

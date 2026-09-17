@@ -134,6 +134,24 @@ describe("Aegis v4 contracts", function () {
     ).to.be.revertedWith("Exceeds daily limit");
   });
 
+  it("reverts with a distinguishable error when the vault has no funds for the trade", async () => {
+    // 金库出资语义：金额在限额内但金库余额不足时，必须与「标的不配合」的
+    // "Trade failed" 区分开，否则运维无法判断是没注资还是被调用方 revert
+    await vault.connect(owner).setLimits(ethers.parseEther("0.04"), ethers.parseEther("0.05"));
+    const amount = ethers.parseEther("0.04");
+    const data = target.interface.encodeFunctionData("ping", [1]);
+    const eh = execHashOf(await target.getAddress(), amount, data);
+    await submitReceipt({ execHash: eh });
+
+    // 抽干金库（withdraw 永不冻结，owner 逃生通道）
+    const bal = await ethers.provider.getBalance(await vault.getAddress());
+    await vault.connect(owner).withdraw(bal);
+
+    await expect(
+      vault.connect(tee).executeTrade(await target.getAddress(), amount, data)
+    ).to.be.revertedWith("Insufficient vault balance");
+  });
+
   it("dead-man switch: freezes when stale, resumes only after a fresh receipt", async () => {
     await submitReceipt({ execHash: ethers.id("exec-x") });
     expect(await registry.isAlive(AGENT_ID, 60)).to.equal(true);

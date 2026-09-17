@@ -29,7 +29,7 @@ export const ADDR = {
     "0xAe58a4F6DD3E2810812193D4766f11d5F3Dfc66F") as `0x${string}`,
   verifier: "0x0eb496471d638173cdF35bE6b0e54FE035289F1f" as `0x${string}`,
   vaultQuorum: (process.env.NEXT_PUBLIC_QUORUM_VAULT ||
-    "0xe6E24BB72a4a327b7A7E7aA025A04eBc5a6533D7") as `0x${string}`,
+    "0x07Be2FCdAA649F11177AaCCbd68A5bFF36aB65bc") as `0x${string}`,
 } as const;
 
 // 与 ReceiptRegistry.MAX_BLOCK_AGE 保持一致（合约常量，改合约需同步这里）

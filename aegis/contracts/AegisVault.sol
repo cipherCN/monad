@@ -76,7 +76,16 @@ contract AegisVault {
 
     /// @notice 执行一笔交易。只有 TEE 可调用；执行体必须与最新交易收据的
     ///         executionHash 完全一致（无收据背书的执行直接 revert）。
-    ///         value 以原生 MON 随调用发送（限额以 value 计量）。
+    ///         value 为交易的标的金额（限额以它计量），由金库自有余额出资。
+    ///
+    /// @dev 出资方是金库而非调用者——这是刻意的，不是 payable 的省略：
+    ///      ① TEE 派生地址是热钱包（in-TEE 自动签名），让它为每笔交易另备资金
+    ///         会抬高密钥泄露的损失上限；金库余额另有 withdraw（onlyOwner、永不冻结）
+    ///         这条独立逃生通道，资金与签名权因此解耦。
+    ///      ② 本流程 PACE 是「授权额度」语义：TEE 的权限上限 = 金库已注资额度，
+    ///         而非它自己钱包里有多少钱。
+    ///      ③ 因此 executeTrade 不是 payable：调用者无法附带 value，只有 owner
+    ///         注入的 deposit() 余额可动，恶意/失陷 TEE 也转不走金库未授权的额度。
     function executeTrade(
         address target,
         uint256 value,
@@ -95,6 +104,10 @@ contract AegisVault {
         uint256 today = block.timestamp / 1 days;
         require(value <= dailyLimit - dailySpent[today], "Exceeds daily limit");
         dailySpent[today] += value;
+
+        // 余额检查显式化：原来由底层 CALL 余额不足时返回 false 兜底，
+        // 报错统一为 "Trade failed"，运维看到时无法区分「标的不配合」与「金库没注资」。
+        require(value <= address(this).balance, "Insufficient vault balance");
 
         (bool success, ) = target.call{value: value}(data);
         require(success, "Trade failed");

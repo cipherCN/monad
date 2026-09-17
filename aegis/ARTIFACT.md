@@ -6,6 +6,11 @@
 >
 > 诚实前提：默认路径**单工作站零 gas**（离线 harness）；链上与 live LLM 项为可选档，见 §4/§5。
 
+**固定 commit（Available 徽章锚点）**：`033eefdfb4f650cab561b00974a9aa225cddfeb4`，
+tag `w11-m2m3-2026-09-16`。**投稿前须建匿名镜像**（Zenodo 或匿名 GitHub 组织）并把
+引用链接指向镜像的该 tag——当前 `origin` 为作者私有仓库 `<anonymous-artifact-mirror>`，
+**不可直接写进论文**（双盲投稿会泄露身份）。
+
 ## 0. 环境要求
 
 - Node.js ≥ 22（开发实测 v24）、npm；`npm install`
@@ -13,23 +18,13 @@
 - 图与 bond 数值（论文侧，可选）：Python 3.10+，matplotlib + numpy（脚本在论文仓 `figs/`，投稿打包时随 artifact 一并收录）
 - 不需要任何 API key 即可跑完 §1 全部（LLM 走 mock 降级，如实标注 mode=mock）
 
-**§1 全部命令无需 `.env`**（镜像不含 `.env`，.gitignore 已忽略）。两点需知：
-
-- `parity-check.mjs` 的策略口径（白名单/限额/黑名单）取自**已提交的** `challenger/challenger-policy.json`，
-  全新克隆无 `.env` 也能复现 17/17；同名环境变量若显式导出仍优先（便于本地临时覆盖）。
-- `soa-demo.mjs` 需要**用户角色**的 EIP-191 签名私钥 `SOA_USER_PK`。该密钥只签目标的 canonical JSON，
-  **不需要资金、不上链**，任意可复现的测试密钥即可：
-  `SOA_USER_PK=0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d node scripts/soa-demo.mjs`
-- DCAP 相关 harness 依赖 `dcap-verifier/artifacts-gen/`，该目录**未入库**（生成物）。它可仅靠 npm 依赖重建
-  （无需 `vendor/`）：`node scripts/compile-dcap.mjs`。产物除 solc metadata 尾部 ipfs 内容哈希外逐字节稳定。
-
 ## 1. 一键零 gas 复现（Functional 徽章主体）
 
 按序执行，每条末尾为预期输出（exit code 0 = 全绿）：
 
 | # | 命令 | 预期 | 验证内容（论文对应） |
 |---|---|---|---|
-| 1 | `npx hardhat test` | 40/40（27 原 + 13 M2/M3） | 合约层安全属性（§5/§7）+ M2/M3 合约（W11） |
+| 1 | `npx hardhat test` | 41/41（28 原 + 13 M2/M3） | 合约层安全属性（§5/§7）+ M2/M3 合约（W11） |
 | 2 | `node challenger/selftest.mjs` | 17/17 | challenger L1–L5 重推导（零共享代码） |
 | 3 | `node scripts/parity-check.mjs` | 17/17, exit 0 | proposer/challenger 口径零分歧 |
 | 4 | `node scripts/attack-family.mjs` | 8 用例：7 拦下 + 1 项 ACCEPTED（设计边界） | 攻击族四格（R1 负对照 + T5/T3/L4） |
@@ -52,29 +47,44 @@ chainId 10143（Monad testnet）。6 个核心合约已 Tenderly **源码级公�
 
 | 合约 | 地址 | Tenderly |
 |---|---|---|
-| AegisVaultQuorum | `0xe6E24BB72a4a327b7A7E7aA025A04eBc5a6533D7` | dashboard.tenderly.co/contract/monad-testnet/0xe6E24BB72a4a327b7A7E7aA025A04eBc5a6533D7 |
+| AegisVaultQuorum (v4) | `0x07Be2FCdAA649F11177AaCCbd68A5bFF36aB65bc` | https://dashboard.tenderly.co/contract/monad-testnet/0x07Be2FCdAA649F11177AaCCbd68A5bFF36aB65bc |
 | ReceiptRegistry (v2) | `0x4622D041696942dC873a8A5E54f1e1ca9669c90B` | 同构链接（换地址） |
 | DcapGate | `0xAe58A4F6DD3E2810812193D4766f11d5F3Dfc66F` | 同上 |
 | ValidationRegistry | `0x8b96a09eb50409FE4c402cB9Bb9D1Ef79bbe0cEa` | 同上 |
 | IdentityRegistry | `0xC99D2957fdA1455E68dF2181A4bB97fd73081A74` | 同上 |
 | ReputationRegistry | `0xb5B853BcE92940b8E5BFba131301509eaCFb5c9f` | 同上 |
 
-W11 新增（M2/M3，2026-09-16 部署，**Tenderly 验证待做**）：
+W11 新增（M2/M3，2026-09-16 部署，**2026-09-16 已完成 Tenderly 源码级公开验证**）：
 
-| 合约 | 地址 |
-|---|---|
-| CommittedOracle（M2 共识提交输入） | `0xe3D4a4F8DA20654dC2D845F130C654beb75C8967` |
-| AtomicExecutor（M2 原子输入–执行绑定，演示件） | `0x0861C00133eCDf67fE61501F61D3fB8969A0e3D6` |
-| AuditDraw（M3 承诺–揭示抽选机） | `0x4EabbF03aa526D4B5C012Cd176D69025Cc52CE45` |
+| 合约 | 地址 | 验证时刻 (UTC) | Tenderly |
+|---|---|---|---|
+| CommittedOracle（M2 共识提交输入） | `0xe3D4a4F8DA20654dC2D845F130C654beb75C8967` | 2026-09-16T23:28:23Z | https://dashboard.tenderly.co/contract/monad-testnet/0xe3D4a4F8DA20654dC2D845F130C654beb75C8967 |
+| AtomicExecutor（M2 原子输入–执行绑定，演示件） | `0x0861C00133eCDf67fE61501F61D3fB8969A0e3D6` | 2026-09-16T23:35:23Z | https://dashboard.tenderly.co/contract/monad-testnet/0x0861C00133eCDf67fE61501F61D3fB8969A0e3D6 |
+| AuditDraw（M3 承诺–揭示抽选机） | `0x4EabbF03aa526D4B5C012Cd176D69025Cc52CE45` | 2026-09-16T23:32:29Z | https://dashboard.tenderly.co/contract/monad-testnet/0x4EabbF03aa526D4B5C012Cd176D69025Cc52CE45 |
 
-匿名可查性一行复测（无凭据）：
+三合约均公开（`"public":true`）+ 编译设置逐项一致：`solc v0.8.24` / `optimizer{enabled:true,runs:200}` / `evmVersion:paris` / `viaIR:true`。匿名核查示例：
 
 ```bash
-curl -s https://api.tenderly.co/api/v1/public-contracts/10143/0xe6e24bb72a4a327b7a7e7aa025a04ebc5a6533d7
-# => "public":true, "contract_name":"AegisVaultQuorum"
+curl -s https://api.tenderly.co/api/v1/public-contracts/10143/0x0861c00133ecdf67fe61501f61d3fb8969a0e3d6
+# => "public":true, "contract_name":"AtomicExecutor", "verification_date":"2026-09-16T23:35:23Z",
+#    compiler_settings{"optimizer":{"enabled":true,"runs":200},"evmVersion":"paris","viaIR":true}
 ```
 
-关键 E2E 交易（Tenderly 有源码级调用栈，`_preExecutionHook` 的 response≥100 闸门 → WMON `deposit()`）：
+验证输入 = 重编译产出的 standard JSON input（含 inline `content`；AtomicExecutor 需带 `contracts/CommittedOracle.sol` 两个 source unit，因其 import）。生成脚本 `scripts/tenderly-prep-w11.mjs`，产物在 `.tenderly-verify/w11-*-standard-input.json`。注意：Tenderly 的 JSON Upload 虽然 UI 文案写 "contract metadata"，但实测喂 solc metadata **会失败**（metadata 只有 source 哈希无 content），必须喂 standard JSON input。另：`tenderly-prep.mjs` 的 runtime bytecode diff 对 AtomicExecutor 会误报——它有 4 个 immutable，构造期写入的 154 字节差异超过该脚本 ≤128 的启发式阈值；**权威判据是 creation-input 比对**（部署 tx calldata vs 重编译 init code + 编码构造参数），三合约均逐字节一致（653 / 1733 / 1807 字节）。
+
+匿名可查性一行复测（无凭据、无登录重定向，2026-09-16 实测）：
+
+```bash
+curl -s https://api.tenderly.co/api/v1/public-contracts/10143/0x07be2fcdaa649f11177aaccbd68a5bff36ab65bc
+# => "public":true, "contract_name":"AegisVaultQuorum",
+#    "verification_date":"2026-09-16T16:56:40Z", "compiler_version":"v0.8.24", "evm_version":"paris",
+#    compiler_settings{"optimizer":{"enabled":true,"runs":200},"evmVersion":"paris","viaIR":true}
+# （地址替换为第一张表任意一行即可同构复测；v4 的三个源文件亦经 data.contract_info 匿名可下载）
+```
+
+关键 E2E 交易（Tenderly 有源码级调用栈，`_preExecutionHook` 的 response≥100 闸门 → WMON `deposit()`）。
+注意：Phase 4 / SOA-lite 那几行走的是 **v2/v3 时代**地址（已废弃，仅作历史留档）；**v4 生产地址上的全链
+E2E 为 2026-09-17 那三行**（`0x07Be2FCd…B65bc`，验证者白名单 + 交易槽钩子在真实执行路径上生效）：
 
 | 步骤 | tx 哈希 | 块 |
 |---|---|---|
@@ -83,13 +93,16 @@ curl -s https://api.tenderly.co/api/v1/public-contracts/10143/0xe6e24bb72a4a327b
 | executeTrade（真实 WMON wrap） | `0x1d30e015733474ecb249743033f0a50fec81988efbbdbe6b63c309d34fd3f99b` | 62366819 |
 | SOA-lite E2E：收据+bindTranscript（objectiveHash 存证） | `0xac1a5c8a2f60f2110d005fd4383c4b9b36d75819ac174c6dbd9b7214bbe904de` | 62756780 |
 | SOA-lite E2E：executeTrade | `0x03a754cf73610a2350a5658e4a1fc90909ca8afbe585bdb9f90f767b81a5f388` | 62756812 |
+| **v4 全链 E2E（2026-09-17）：金库 `deposit()` 注资 0.5 MON** | `0x92e6e5425dcc2281f92c7a2223517f6a83da79a4f5a0c4cea63c89d7e4c179c4` | — |
+| **v4 全链 E2E：收据提交（DCAP verified，经 `submitReceiptWithQuote`）** | `0xf9e49b5b22b878e3f225180d2ada035b516389a4d12694849cfc7a4d174d8d7b` | — |
+| **v4 全链 E2E：`executeTrade`（金库余额出资；WMON 0 → 0.01）** | `0x42048bec27b97c3c640cf21e701a2a87e23f1f7d313c765bd3990852b4b76b05` | — |
 | M2：postObservation（共识提交输入，commitRoot=链下重算一致） | `0xd8a8dc9efad004aa7ca05d258105e813a924fe4cd58e09d34fcddc02417aada3` | 63051989 |
 | M2：executeAtomic（原子读输入 + 真 WMON wrap 0.01，executor 0→0.01） | `0x2dc3210087fef1fdbe08dccf928904da1cdcc5a10b476f891d513e4d76f29941` | 63051997 |
 | M2 负例：伪造根 → revert（status=0） | `0xfb6d87194c7168aee96809457e12232021fdb06f249b0c6c3fb18b68f39f8d6b` | 63052002 |
 | M3：commitDraw（承诺） | `0xbbb72dfff340913cf410bf96b6a2652ae72d7b10589e5b54c18f7f035dcefcd0` | 63052007 |
 | M3：revealDraw（揭示，200 索引链上==链下重算） | `0xb7336a0dc8dbb39fe6ff170952b249c3ea324e1359c0ee6a4d1a1c6b42ff8a82` | 63052022 |
 
-其余链上记录（D6 九向量 gas 3,837,429、quorum E2E、DCAP verifyQuote 等）见 `dcap-verifier/STATUS.md`。
+其余链上记录（D6 八向量 + 一正例的 gas 3,837,429、quorum E2E、DCAP verifyQuote 等）见 `dcap-verifier/STATUS.md`。
 
 ## 3. 链上读侧快照（RPC 历史不依赖）
 
@@ -102,7 +115,7 @@ Monad testnet 无归档公共端点保证（`eth_getLogs` 限 100 块、间歇 A
 钱包余额不足时跳过，不阻塞 Functional 徽章：
 
 - `node scripts/soa-demo.mjs --onchain` — SOA-lite 全链 5/5（需 orchestrator + challenger 在跑，≈0.37 MON）
-- `node scripts/d6-negative.mjs` — 9 攻击向量 + 1 正例（fresh 合约部署 ~0.78 MON + 运行 ~0.15 MON）
+- `node scripts/d6-negative.mjs` — 8 攻击向量 + 1 正例对照（fresh 合约部署 ~0.78 MON + 运行 ~0.15 MON）
 - `node scripts/tee-adversary-sim.mjs --live` — 默认校验文档证据（STATUS.md 的 D6-A6 revert 记录），
   `--live` 改为真实上链重跑 d6-negative（fresh 合约部署 ~0.78 MON + 运行 ~0.15 MON）
 - `node scripts/m2m3-testnet.mjs` — M2/M3 全链实测（三合约部署 + postObservation + executeAtomic
@@ -143,3 +156,12 @@ API 不可达时管线自动降级 mock 并如实标注 mode=mock（此时数字
    gasUsed 等于 gasLimit（节点对 revert 交易的计费行为），不是逻辑实际消耗；本地 hardhat 实测同路径实际消耗 31,769。
 9. **M3 抽选参数 N=1000/n=200 为演示参数**：AuditDraw 的 receiptCount/sampleSize 由调用方传入，
    论文若引用需注明该组数字的演示口径；生产参数与审计覆盖率的关系归 T4 的 \(N\) 与 δ_audit 分配。
+10. **`executeTrade` 的金库余额检查仅在源码、线上 v4 未生效**：`AegisVault.executeTrade` 现含
+    `require(value <= address(this).balance, "Insufficient vault balance")`（外部调用前置检查，
+    避免"金库余额不足"在目标合约处表现为晦涩失败）。该检查**未重部署**——线上
+    `0x07Be2FCd…B65bc` 仍是修复前字节码，差异为 1 条 `require`（+75 字节），**ABI 逐字节不变**，
+    故不影响任何已声明的安全属性，也不影响 Tenderly 源码级验证对已部署字节码的成立性
+    （复核：长度匹配的 build-info 经 `scripts/diff-immutables.mjs` 分类 → `unknown clusters: 0`）。
+    论文/评委侧引用口径：源码有该检查 + 单测覆盖（41/41）；若引用链上证据，需注明线上为修复前版本。
+11. **v4 全链 E2E 的区块号未记录**：2026-09-17 的三笔 tx（§2 表）为 `eth_sendRawTransaction` 返回值，
+    当时未落盘区块号；tx 哈希可在 Monad 区块浏览器直接查证，但 artifact 表内的"块"列为 `—`。

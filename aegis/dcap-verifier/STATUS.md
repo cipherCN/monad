@@ -172,5 +172,8 @@ ROOT cert / SIGNING cert / PLATFORM cert / root CA CRL / PCK CRL / TCB info / QE
 - setup：guardrail 0x1111...11、TEE 授权、MockTarget 部署、白名单/限额、vault 注资 0.5 MON
 - 场景1（无验证）：executeTrade revert "No challenger quorum"——TradeExecuted 事件扫描确认该场景 0 个事件
 - 场景2（challenger 同意）：validationRequest + validationResponse(100) → executeTrade 成功，**TradeExecuted 事件 @块 62070391，tx 0xa16248508c76f82d1a9381ca3836e1a457a1410ec8aab63e60e9f077a6b7d965**
-- 注意：executeTrade 的 target.call 不带 value（原生 MON 传递为已知边界），vault 余额不动属正常
+- 注意（**该条已被后续版本推翻，保留作历史**）：当时 v1 的 `executeTrade` 未给 `target.call` 传 value，故金库余额不动。
+  v2 起 `executeTrade` 已 `target.call{value: value}(data)`——**出资方是金库自有余额**（`deposit()` 注入），
+  `executeTrade` 本身**非 payable**（刻意设计，三条理由见 `contracts/AegisVault.sol` 的 `@dev`）。
+  本条当时的"已知边界"已在 v2 消解；Phase 4 及之后的 E2E 均可见金库余额真实变动。
 - 主钱包剩 ~0.38 MON；challenger 剩 ~4 MON
