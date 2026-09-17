@@ -28,12 +28,17 @@ The short version:
 
 ```bash
 cd aegis
-npm install
-npx hardhat test                   # 41/41, no gas
-node challenger/selftest.mjs       # 17/17
-node scripts/parity-check.mjs      # 17/17
-node scripts/attack-family.mjs     # 7 blocked / 1 accepted-as-designed
+npm ci                             # lockfile is committed; .npmrc pins legacy-peer-deps
+npx hardhat test                   # 41 passing, no gas
+node challenger/selftest.mjs       # 17 pass / 0 fail
+node scripts/parity-check.mjs      # 17 agree / 0 diverge
+node scripts/attack-family.mjs     # 7/8 blocked; 8 as-expected / 0 unexpected
+node scripts/atomic-input.mjs      # ALL REGIMES PASS (4/4)
+node scripts/tee-adversary-sim.mjs # ALL LEGS PASS
 ```
+
+`scripts/soa-demo.mjs` additionally needs a throwaway user-role signing key; see
+below. `scripts/regime-cost.mjs` prints the cost table and the ε-net table.
 
 All on-chain evidence referenced by the paper is verifiable in a browser with no
 local environment: see `aegis/ARTIFACT.md` §2 for Tenderly public-verification
@@ -81,9 +86,10 @@ reproduce the paper's results and some of which contain non-public context.
 
 ## Provenance
 
-The tree here corresponds to the paper's frozen artifact revision. The `main`
-branch carries a single curated commit; the tag marks the revision referenced by
-the paper.
+The tree here corresponds to the paper's frozen artifact revision. The tag
+`artifact-anon-2026-09-17` marks the exact revision referenced by the paper;
+`main` points at the same commit. All commits are authored by the neutral
+placeholder `aegis-dev <aegis@local>`.
 
 ## License
 

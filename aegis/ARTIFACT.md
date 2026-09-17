@@ -6,14 +6,15 @@
 >
 > 诚实前提：默认路径**单工作站零 gas**（离线 harness）；链上与 live LLM 项为可选档，见 §4/§5。
 
-**固定 commit（Available 徽章锚点）**：`033eefdfb4f650cab561b00974a9aa225cddfeb4`，
-tag `w11-m2m3-2026-09-16`。**投稿前须建匿名镜像**（Zenodo 或匿名 GitHub 组织）并把
-引用链接指向镜像的该 tag——当前 `origin` 为作者私有仓库 `<anonymous-artifact-mirror>`，
-**不可直接写进论文**（双盲投稿会泄露身份）。
+**固定 commit（Available 徽章锚点）**：`2bd982c34418e228c208162a2e4fdfc9dec89fd6`，
+tag `artifact-anon-2026-09-17`。本目录树即该 tag 的内容，故本文件中的相对路径可直接对照。
+仓库地址见论文 artifact 章节给出的匿名镜像链接；**本文件的提交身份为中性占位符
+`aegis-dev <aegis@local>`**，不包含任何作者身份信息。
 
 ## 0. 环境要求
 
-- Node.js ≥ 22（开发实测 v24）、npm；`npm install`
+- Node.js ≥ 22（开发实测 v24）、npm。在 `aegis/` 下执行 `npm ci`（推荐，锁文件已提交）
+  或 `npm install`；`aegis/.npmrc` 已固定 `legacy-peer-deps`，干净克隆可直接安装
 - 合约编译：`npx hardhat compile`（**evm target 必须 paris**——Monad MCOPY 行为不正确，见 README"Monad 特性实测"）
 - 图与 bond 数值（论文侧，可选）：Python 3.10+，matplotlib + numpy（脚本在论文仓 `figs/`，投稿打包时随 artifact 一并收录）
 - 不需要任何 API key 即可跑完 §1 全部（LLM 走 mock 降级，如实标注 mode=mock）
