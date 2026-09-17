@@ -29,15 +29,48 @@ The short version:
 ```bash
 cd aegis
 npm install
-npx hardhat test              # 40/40, no gas
-node scripts/attack-family.mjs
-node scripts/selftest.mjs
-node scripts/parity-check.mjs
+npx hardhat test                   # 40/40, no gas
+node challenger/selftest.mjs       # 17/17
+node scripts/parity-check.mjs      # 17/17
+node scripts/attack-family.mjs     # 7 blocked / 8 as-expected
 ```
 
 All on-chain evidence referenced by the paper is verifiable in a browser with no
 local environment: see `aegis/ARTIFACT.md` §2 for Tenderly public-verification
 links (9 contracts) and the end-to-end transaction table.
+
+### Running without a `.env`
+
+These harnesses are deliberately **environment-free**: no `.env`, no API key, and
+no funds are needed. Two details make that work.
+
+- **Policy fixtures.** `scripts/parity-check.mjs` derives its whitelist / limits /
+  blocklist from the committed `challenger/challenger-policy.json`, so a fresh
+  clone with no `.env` still reproduces 17/17. Explicitly exported environment
+  variables of the same name still take precedence if you want to override
+  locally. (Without this, an absent `.env` yields an empty whitelist and the
+  objective fixtures are rejected by the artifact-side field check, producing
+  spurious divergence.)
+- **The SOA signing key.** `scripts/soa-demo.mjs` needs a *user-role* EIP-191
+  signing key via `SOA_USER_PK`. It signs the objective's canonical JSON only —
+  it needs no funds and never touches the chain, so any reproducible test key is
+  fine:
+  `SOA_USER_PK=0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d node scripts/soa-demo.mjs`.
+
+### DCAP verifier artifacts
+
+`aegis/dcap-verifier/artifacts-gen/` is **not** checked in (it is generated). The
+DCAP harnesses need it, and it rebuilds from npm dependencies alone — no
+`vendor/` tree, no network beyond `npm install`:
+
+```bash
+cd aegis
+node scripts/compile-dcap.mjs      # writes dcap-verifier/artifacts-gen/*.json
+```
+
+The output is byte-stable apart from the trailing solc metadata `ipfs` content
+hash, which varies between compiles of the same source with identical flags and
+does not affect the compiled runtime code.
 
 ## Scope
 

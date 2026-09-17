@@ -13,6 +13,16 @@
 - 图与 bond 数值（论文侧，可选）：Python 3.10+，matplotlib + numpy（脚本在论文仓 `figs/`，投稿打包时随 artifact 一并收录）
 - 不需要任何 API key 即可跑完 §1 全部（LLM 走 mock 降级，如实标注 mode=mock）
 
+**§1 全部命令无需 `.env`**（镜像不含 `.env`，.gitignore 已忽略）。两点需知：
+
+- `parity-check.mjs` 的策略口径（白名单/限额/黑名单）取自**已提交的** `challenger/challenger-policy.json`，
+  全新克隆无 `.env` 也能复现 17/17；同名环境变量若显式导出仍优先（便于本地临时覆盖）。
+- `soa-demo.mjs` 需要**用户角色**的 EIP-191 签名私钥 `SOA_USER_PK`。该密钥只签目标的 canonical JSON，
+  **不需要资金、不上链**，任意可复现的测试密钥即可：
+  `SOA_USER_PK=0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d node scripts/soa-demo.mjs`
+- DCAP 相关 harness 依赖 `dcap-verifier/artifacts-gen/`，该目录**未入库**（生成物）。它可仅靠 npm 依赖重建
+  （无需 `vendor/`）：`node scripts/compile-dcap.mjs`。产物除 solc metadata 尾部 ipfs 内容哈希外逐字节稳定。
+
 ## 1. 一键零 gas 复现（Functional 徽章主体）
 
 按序执行，每条末尾为预期输出（exit code 0 = 全绿）：

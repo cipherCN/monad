@@ -12,7 +12,7 @@
 //   - challenger 侧：challenger/verify.mjs 的完整 4 层重推导（纯离线）
 // 然后断言两侧对「拒绝与否」的结论一致。
 //
-// 用法：node scripts/parity-check.mjs
+// 用法：node scripts/parity-check.mjs（离线可复现：策略口径取自已提交的 challenger-policy.json，无需 .env）
 import { loadEnv } from "./lib.mjs";
 import { runGuardrail, paceVerify, normalize } from "../tee-runtime/runtime.mjs";
 import { checkObjective as proposerObjective } from "../tee-runtime/objective.mjs";
@@ -28,9 +28,14 @@ loadEnv();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const policy = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "challenger", "challenger-policy.json"), "utf8"));
 
-const WHITELIST = (process.env.WHITELIST || "").split(",").map((x) => x.toLowerCase()).filter(Boolean);
-const PER_TX_LIMIT = BigInt(process.env.PER_TX_LIMIT || "50000000000000000");
-const BLOCKLIST = (process.env.BLOCKLIST || "").split(",").filter(Boolean);
+// 离线可复现：策略口径取自已提交的 challenger/challenger-policy.json，而不是本机 .env。
+// .env 被 gitignore —— 全新克隆下缺失会让 WHITELIST 为空、目标地址变 undefined，
+// 使全部 obj-* 用例被 artifact 侧的字段校验拦下、产生假性漂移。
+// 显式设置的同名环境变量仍然优先，便于本地临时覆盖。
+const fromPolicy = (k, d) => (process.env[k] !== undefined ? process.env[k] : d);
+const WHITELIST = fromPolicy("WHITELIST", policy.whitelist.join(",")).split(",").map((x) => x.toLowerCase()).filter(Boolean);
+const PER_TX_LIMIT = BigInt(fromPolicy("PER_TX_LIMIT", String(policy.perTxLimit)));
+const BLOCKLIST = fromPolicy("BLOCKLIST", policy.blocklist.join(",")).split(",").filter(Boolean);
 const ASSETS = { USDC: WHITELIST[0] };
 
 // ---- 与 orchestrator/server.mjs 的预览**同判据**（含 normalize） ----
