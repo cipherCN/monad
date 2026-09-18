@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useL } from "@/lib/i18n";
+import { SampleBanner } from "@/components/SampleBanner";
 import { Sparkles, Check } from "lucide-react";
 
 const STEPS = [
@@ -16,6 +17,12 @@ export default function CreateAgentPage() {
 
   return (
     <div className="mx-auto max-w-5xl">
+      <SampleBanner
+        note={L(
+          "本页是未接后端的界面原型：表单不提交、身份铸造未接线，所有输入框均为占位（不读链上状态，也不写任何东西）。真实可验证的 agent 目前只有 agentId=1，其身份注册见「验证器」与「收据流」。",
+          "This is a UI prototype with no backend: the form does not submit, identity minting is not wired up, and every input is a placeholder (it reads no chain state and writes nothing). The only real, verifiable agent today is agentId=1 — see Verifier and Receipts."
+        )}
+      />
       <div className="mb-5 flex items-center gap-2">
         <Sparkles className="h-5 w-5 text-cyan" />
         <h1 className="text-lg font-semibold">{L("创建 Agent", "Create Agent")}</h1>
@@ -25,31 +32,37 @@ export default function CreateAgentPage() {
         {/* form */}
         <div className="card space-y-4 p-5">
           <Field label={L("名称", "Name")}>
-            <input className="inp" placeholder="Aegis Alpha" />
+            <input className="inp" placeholder="Aegis Alpha" disabled />
           </Field>
           <Field label={L("描述", "Description")}>
-            <textarea className="inp min-h-[72px]" placeholder={L("策略简介…", "Strategy summary…")} />
+            <textarea className="inp min-h-[72px]" placeholder={L("策略简介…", "Strategy summary…")} disabled />
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label={L("策略类型", "Strategy type")}>
-              <select className="inp">
+              <select className="inp" disabled>
                 <option>趋势跟随</option>
                 <option>网格</option>
                 <option>稳定币收益</option>
               </select>
             </Field>
             <Field label={L("初始资金", "Initial capital")}>
-              <input className="inp mono" placeholder="0.0 MON" />
+              <input className="inp mono" placeholder="0.0 MON" disabled />
             </Field>
           </div>
           <Field label={L("TEE 派生地址", "TEE derived address")}>
-            <input className="inp mono" placeholder="0x…" />
+            <input className="inp mono" placeholder="0x…" disabled />
           </Field>
           <Field label={L("度量白名单（MRTD/RTMR）", "Measurement allowlist (MRTD/RTMR)")}>
-            <input className="inp mono" placeholder="a7f2c8d9… , b19e04f3…" />
+            <input className="inp mono" placeholder="a7f2c8d9… , b19e04f3…" disabled />
           </Field>
-          <button className="w-full rounded-lg bg-cyan py-2.5 text-sm font-medium text-base hover:opacity-90">
-            {L("创建 Agent 并铸造身份", "Create & mint identity")}
+          {/* 原按钮无 onClick，点了毫无反应 —— 比 disabled 更容易被误读成"功能坏了"。
+              明确禁用并说明原因，不再假装是可用功能。 */}
+          <button
+            disabled
+            title={L("后端未实现", "backend not implemented")}
+            className="w-full cursor-not-allowed rounded-lg bg-cyan py-2.5 text-sm font-medium text-base opacity-50"
+          >
+            {L("创建 Agent 并铸造身份（未实现）", "Create & mint identity (not implemented)")}
           </button>
         </div>
 
@@ -103,6 +116,10 @@ export default function CreateAgentPage() {
         }
         .inp:focus {
           border-color: rgba(0, 229, 204, 0.4);
+        }
+        .inp:disabled {
+          cursor: not-allowed;
+          opacity: 0.55;
         }
       `}</style>
     </div>

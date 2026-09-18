@@ -174,14 +174,23 @@ const norm = (s) =>
     .replace(/[01345$@]/g, (c) => LEET[c] ?? c)
     .trim();
 
+// ⚠️ 本表必须与 challenger/verify.mjs 的 INJECTION_PATTERNS 逐条一致。
+// 模式需容忍 leet 折叠产物（"a11" -> "aii"）——否则混淆注入会漏判且两侧结论漂移。
+// scripts/parity-check.mjs 对每条模式都有一个用例（injection-* 前缀），少一条就会 DIFF。
+const INJECTION_PATTERNS = [
+  /ignore (a[il1]+ )?previous/,   // all / aii（1->i 折叠产物）/ ali
+  /disregard .*instruction/,
+  /you are now/,
+  /system prompt/,
+  /urgent.*(swap|transfer|send) (a[il1]+|everything)/,
+];
+
 function runGuardrail(text, blocklist) {
   // ⚠️ 先规范化 text 再匹配：否则零宽字符/大小写混淆可绕过 blocklist
   // （例如 "ev\u200Bil.com" 不含子串 "evil.com"，但去零宽后就是它）
   const t = norm(text);
   const reasons = [];
-  // 模式需容忍 leet 折叠产物（"a11" -> "aii"）—— 必须与 challenger/verify.mjs 的
-  // INJECTION_PATTERNS 保持同口径，否则混淆注入会漏判且两侧结论漂移。
-  if (/ignore (a[il1]+ )?previous/.test(t)) reasons.push("injection_pattern");
+  for (const re of INJECTION_PATTERNS) if (re.test(t)) reasons.push("injection_pattern");
   if (/(airdrop|空投)/.test(t) && /(swap|换成|transfer)/.test(t)) reasons.push("suspicious_social_engineering");
   for (const b of blocklist) if (t.includes(norm(b))) reasons.push("blocklist:" + b);
   return reasons;
@@ -544,7 +553,7 @@ const server = http.createServer(async (req, res) => {
         trustBoundary: {
           devices: [
             { role: "proposer", name: "Proposer 机器（本机）", holds: ["MONAD_TESTNET_PK"], note: "双 LLM 管线 + 确定性 δ 预览；持有 TEE 私钥，可提交收据" },
-            { role: "challenger", name: "Challenger 机器（独立）", holds: ["CHALLENGER_PK"], note: "不共享代码、独立钱包上链 validation；可选 L5 跨家族模型层（默认关闭）" },
+            { role: "challenger", name: "Challenger 机器（独立）", holds: ["CHALLENGER_PK"], note: "独立钱包上链 validation；verify.mjs 只依赖 ethers + 自己的 objective.mjs（单向零依赖，反向有一处复用见文档）；可选跨家族模型层默认关闭（非 L5，L5 专指目标层）" },
             { role: "tee", name: "Phala CVM（TDX）", holds: [], note: "实时生成绑定 digest 的 TDX quote，链上 DCAP 验真" },
           ],
           llmPlacement: "proposer",

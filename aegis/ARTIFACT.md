@@ -6,16 +6,16 @@
 >
 > 诚实前提：默认路径**单工作站零 gas**（离线 harness）；链上与 live LLM 项为可选档，见 §4/§5。
 
-**固定 commit（Available 徽章锚点）**：tag `artifact-anon-2026-09-17`，本目录树即该 tag 的内容，
-故本文件中的相对路径可直接对照。固定 commit sha 请以 tag 解析为准（`git rev-parse artifact-anon-2026-09-17`）——
-**论文引用写仓库 URL + tag 名，不写裸 sha**。
-仓库地址见论文 artifact 章节给出的匿名镜像链接；**本文件的提交身份为中性占位符
-`aegis-dev <aegis@local>`**，不包含任何作者身份信息。
+**固定 commit（Available 徽章锚点）**：匿名镜像
+`https://github.com/<anonymous-artifact-mirror>`，tag **`artifact-anon-2026-09-17`**。
+**论文引用一律写仓库 URL + tag 名，不写裸 sha**（镜像 tag 曾因文档修正重打过，裸 sha 会漂；
+固定 sha 以 tag 解析为准：`git rev-parse artifact-anon-2026-09-17`）。该镜像提交身份全为中性占位符
+`aegis-dev <aegis@local>`，不含作者身份信息；本地开发仓 `Monad量化` 为私有仓，
+**其地址不得写入论文**（双盲）。镜像内 `aegis/ARTIFACT.md` 即本文件的对等版本（内容一致，仅锚点段不同）。
 
 ## 0. 环境要求
 
-- Node.js ≥ 22（开发实测 v24）、npm。在 `aegis/` 下执行 `npm ci`（推荐，锁文件已提交）
-  或 `npm install`；`aegis/.npmrc` 已固定 `legacy-peer-deps`，干净克隆可直接安装
+- Node.js ≥ 22（开发实测 v24）、npm；`npm install`
 - 合约编译：`npx hardhat compile`（**evm target 必须 paris**——Monad MCOPY 行为不正确，见 README"Monad 特性实测"）
 - 图与 bond 数值（论文侧，可选）：Python 3.10+，matplotlib + numpy（脚本在论文仓 `figs/`，投稿打包时随 artifact 一并收录）
 - 不需要任何 API key 即可跑完 §1 全部（LLM 走 mock 降级，如实标注 mode=mock）
@@ -27,8 +27,8 @@
 | # | 命令 | 预期 | 验证内容（论文对应） |
 |---|---|---|---|
 | 1 | `npx hardhat test` | 41/41（28 原 + 13 M2/M3） | 合约层安全属性（§5/§7）+ M2/M3 合约（W11） |
-| 2 | `node challenger/selftest.mjs` | 17/17 | challenger L1–L5 重推导（零共享代码） |
-| 3 | `node scripts/parity-check.mjs` | 17/17, exit 0 | proposer/challenger 口径零分歧 |
+| 2 | `node challenger/selftest.mjs` | 17/17 | challenger L1–L5 重推导（单向独立：不 import proposer） |
+| 3 | `node scripts/parity-check.mjs` | 21/21, exit 0 | proposer/challenger 口径零分歧（14 护栏/PACE + 7 目标层） |
 | 4 | `node scripts/attack-family.mjs` | 8 用例：7 拦下 + 1 项 ACCEPTED（设计边界） | 攻击族四格（R1 负对照 + T5/T3/L4） |
 | 4b | `node scripts/atomic-input.mjs` | `ALL REGIMES PASS`（4/4） | M2 输入格两 regime 对照：链下=设计边界 / 链上承诺=BLOCKED（W11，§8.2 第 1 行升级件） |
 | 5 | `node scripts/tee-adversary-sim.mjs` | `ALL LEGS PASS` | 对抗 TEE 仿真三腿：策略后门族离线拦截 + D6-A6（真 quote 错护栏 revert，文档证据模式）+ 链上 quorum 闸门 |
@@ -145,8 +145,14 @@ API 不可达时管线自动降级 mock 并如实标注 mode=mock（此时数字
 1. **单工作站默认**：§1 的 challenger 与 proposer 同机跑；"2-of-2" 的独立性主张以 §6 的另机部署为准，
    论文表述为 "single-workstation default; true 2-of-2 by redeploying challenger"。
 2. **in-TEE 收据更正**：tx `0x8563c26e…`（gas 3,474,328）的 guardrailHash 来自当时手写实现，
-   ≠ 链上认证值；修复后未重跑 CVM E2E。该收据的 gas 数字为真实运行值可引用，
+   ≠ 链上认证值。该收据的 gas 数字为真实运行值可引用，
    **不得**引用其"摘要与 challenger 一致"语义。
+   修复后的口径已由 tx `0xadf52203…003be`（2026-09-18 复跑）取代，见下一条。
+2b. **in-TEE CVM E2E 已复跑（2026-09-18）**：tx `0xadf522038b8ace6d7ada14ca491b527eb3ab8caf630153d2570b799ec96003be`
+   @63607466（gas 3,477,689，`status=1`），CVM 内 `GUARDRAIL_HASH=0x0fd539cd…cfb84` = 链上 `agentGuardrailHash`，
+   事件三字段（executionHash/pdrHash/guardrailHash）与 CVM 日志逐字段一致。**边界**：该进程止于
+   `submitReceiptWithQuote`；`challenger 重推导→validationResponse→executeTrade` 属第二段，由 v4 全链 E2E
+   （tx `0x42048bec…76b05`）覆盖。**不存在一次进程内跑完全链的证据，不得声称"单进程全链"。**
 3. **交叉模型层已不可复现**：原 proposer=deepseek / challenger=glm 网关端点已于 2026-09-15 删除，
    交叉模型层需另配端点（默认关闭）；论文不声称 cross-family 复现。
 4. **输入真实性不在覆盖内**（R1 不可能性）：`attack-family.mjs` 第一格 ACCEPTED 是刻意的负对照。

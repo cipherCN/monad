@@ -8,7 +8,8 @@
  */
 
 // 同源代理（next.config.mjs rewrites 把 /orch/* 转发到 orchestrator），
-// 因此不需要 orchestrator 开 CORS，也不把内网地址暴露给浏览器。
+// 因此演示链路不经 CORS（orchestrator 自身的 ALLOWED_ORIGINS 白名单是给
+// 非浏览器直连用的，见 aegis/.env.example），也不把内网地址暴露给浏览器。
 export const ORCH = process.env.NEXT_PUBLIC_ORCH_ORIGIN || "/orch";
 
 export interface LlmMeta {
@@ -80,7 +81,7 @@ export interface VerifyResponse {
   proposer: { verdict: "accept" | "reject"; guardrail: string[]; pace: string | null };
   challenger: {
     verdict: "accept" | "reject" | null;
-    /** challenger 四层独立重推导的逐层结果，形如 { "1_policy": "pass", ... } */
+    /** challenger 逐层独立重推导结果（L1–L5），形如 { "1_policy": "pass", ... } */
     layers?: Record<string, string>;
     mismatches?: string[];
     error?: string;

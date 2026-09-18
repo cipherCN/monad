@@ -7,7 +7,7 @@
 > 用自己的代码独立重推导同一结论（L1–L5 五层），2-of-2 一致才放行执行。任何人在 Monad 链上即可独立验证。
 
 对应策略文档 `../第四版策略.md`。
-**状态：41/41 单测 + challenger selftest 17/17 + parity 17/17 + 全链路 Monad testnet 实测（见"已验证里程碑"）。**
+**状态：41/41 单测 + challenger selftest 17/17 + parity 21/21 + 全链路 Monad testnet 实测（见"已验证里程碑"）。**
 
 ## 信任边界（务必照此口径讲）
 
@@ -33,7 +33,7 @@
         TEE 生成 TDX quote（report_data = semanticDigest，Phala CVM）
                                 │ submitReceiptWithQuote → 链上 DCAP 验真 + blockhash 绑定
                                 ▼
-        challenger 独立重推导（自持策略 + 零共享代码；L1–L5 + 可选交叉模型层）
+        challenger 独立重推导（自持策略 + 不 import proposer 任何模块；L1–L5 + 可选交叉模型层）
                                 │ validationResponse(requestHash=收据digest, 100/0)
                                 ▼
         AegisVaultQuorum._preExecutionHook：response≥100 才放行
@@ -42,8 +42,8 @@
 ```
 
 **为什么 LLM 在 TEE 之外**：威胁模型假设模型完全可被操纵（提示注入、数据投毒）。把可被操纵的东西放进 TEE
-只保护它的机密性，不产生"决策正确"的保证。真正的保证是：**同一份决策，由零共享代码、不同模型家族的
-challenger 独立重推导，结论一致才执行**。TEE 解决"谁在什么环境跑"，challenger 解决"决策本身是否一致"
+只保护它的机密性，不产生"决策正确"的保证。真正的保证是：**同一份决策，由独立的第二套实现（不同代码路径、
+可选不同模型家族）重推导，结论一致才执行**。TEE 解决"谁在什么环境跑"，challenger 解决"决策本身是否一致"
 ——两个正交的信任维度。
 
 ## 目录
@@ -59,17 +59,18 @@ contracts/
   ValidationRegistry.sol       ERC-8004 Validation（自部署：官方 "coming soon"）
 challenger/                    独立验证进程（可整目录拷到另一台机器 = 真 2-of-2）
   verify.mjs                   5 层独立重推导：L1 策略认证 / L2 独立护栏 / L3 独立 PACE / L4 算术+transcript preimage / L5 用户目标层（SOA-lite）
-  objective.mjs                L5 独立实现：canonical 目标序列化 + EIP-191 验签 + ε-最优检查（与 proposer 零共享代码）
+  objective.mjs                L5 独立实现：canonical 目标序列化 + EIP-191 验签 + ε-最优检查（不 import proposer）
   challenger-agent.mjs         轮询链上收据 → 拉决策原文（拉不到=拒绝）→ 重推导 → 独立钱包上链 validation
   llm-challenge.mjs            交叉模型层（可选：MODEL_CHALLENGE=true 开启，须与 proposer 不同家族，默认关闭）
   challenger-policy.json       challenger 自持策略（与 proposer env 严格一致，policy-attest 上链认证）
   policy-attest.mjs            治理侧把认证 guardrailHash 设上链（--execute）
 dcap-verifier/                 链上 DCAP 全栈（Automata V4 verifier + PCCS DAO + DcapGate），STATUS.md 完整记录
 tee-runtime/                   Agent 循环（双 LLM 隔离管线 → 护栏 → PACE → 目标层 → 收据哈希；objective.mjs = L5 proposer 侧实现）
-tee/intee/                     In-TEE 自治闭环（Phala CVM 实测；2026-09-16 改为复用 tee-runtime/challenger 模块，见 STATUS.md 更正）
+tee/intee/                     In-TEE 自治闭环（Phala CVM 实测；2026-09-16 改为复用 tee-runtime/challenger 模块，2026-09-18 复跑通过，见 STATUS.md）
 orchestrator/                  零依赖服务：读侧（状态/收据/决策原文/SSE）+ 写侧（POST 决策 → 上链）；角色分离：本进程只当 proposer，不持有 challenger 私钥
 scripts/                       部署/验证/索引/负例/探测（d6-negative、parity-check、probe-dex、whitelist-wmon…）
-test/aegis.test.js             26 个测试
+test/aegis.test.js             28 个测试（另有 m2m3.test.js 13 个，合计 41）
+test/m2m3.test.js              M2 共识提交输入 / M3 承诺-揭示抽选机
 dashboard/                     Next.js 14 统一入口（评审动线：总览 → 现场跑一笔 → 独立验证器 → 架构与信任边界 → 收据流）
 ```
 
@@ -83,12 +84,12 @@ dashboard/                     Next.js 14 统一入口（评审动线：总览 �
 | E2E | **In-TEE 自治闭环**（CVM 内无人干预） | 护栏→PACE→读链→quote→上链 |
 | — | **ERC-8004 三注册表**（自部署） | agentId=1 注册 + 验证闭环(response=100) + 声誉(getSummary=100) |
 | D6 | **负例测试**（9+ 项攻击向量） | 全部被拒；坏 quote 位置扫描 11/13 捕获（2 MISS 均在证书尾部惰性 padding，非签名覆盖区） |
-| P1 | **Challenger 独立性包** | 4 层独立重推导（现已扩展到 5 层 / 17 用例）+ 决策原文存证 + fail-closed；角色分离：proposer 不代签 validation |
+| P1 | **Challenger 独立性包** | 4 层独立重推导（现已扩展到 5 层 / 17 用例）+ 决策原文存证 + fail-closed；角色分离：proposer 不代签 validation；**方向：challenger 侧不 import proposer，反向有一处复用（dry-run 预览）** |
 | P2 | **合约 v2 + quote 路径上线** | ReceiptRegistry v2（bindTranscript）+ AegisVaultQuorum v2（executeTrade 由金库自有余额出资）；Phala CVM quote 实时生成 → 链上 DCAP 验真 |
 | P3 | **双 LLM 隔离管线 + 跨家族** | 隔离 LLM（无工具）→ 特权 LLM（只吃可信指令+摘要）→ δ 裁决；proposer=deepseek-flash / challenger=glm-5.3-flash（**经网关指纹实测确认不同后端**，见 `scripts/probe-gateway.mjs`；**该端点已于 2026-09-15 删除，交叉模型层现需另配端点**）；parity-check 守住两侧口径 |
 | P4 | **真实协议交互路径** | 官方 canonical WMON wrap：LLM intent → `deposit()` calldata → executeTrade（金库余额出资）→ 金库 WMON 0→0.01（四笔 tx 全链实测，见下） |
 | P6 | **统一入口 Dashboard** | 评审动线四页 + `/orch/*` 同源代理 + 一键负例（11 向量实测全过）+ 11 个负例浏览器内断言 |
-| P7 | **SOA-lite 签署目标层（L5）** | 用户 EIP-191 签署客观目标（金额区间/标的/期限/nonce，不签动作）→ 两侧零共享代码独立验签 + ε-最优检查 → `objectiveHash` 经 `bindTranscript` 上链存证；意图漂移/篡改/过期/超签署上限全部被拒；**链上 E2E 已实测 5/5**（见下，`scripts/soa-demo.mjs --onchain`、`selftest 17/17`、`parity 17/17`） |
+| P7 | **SOA-lite 签署目标层（L5）** | 用户 EIP-191 签署客观目标（金额区间/标的/期限/nonce，不签动作）→ 两侧独立实现验签 + ε-最优检查 → `objectiveHash` 经 `bindTranscript` 上链存证；意图漂移/篡改/过期/超签署上限全部被拒；**链上 E2E 已实测 5/5**（见下，`scripts/soa-demo.mjs --onchain`、`selftest 17/17`、`parity 21/21`） |
 | — | **攻击族四格 + 代价曲线实验** | 四类攻击者（R1 代换 / 策略后门 / 意图漂移 / 混淆代理）完整验证链实测 7/8 拦下（1 项 = 输入真实性不可能性，设计边界）；L1–L5 全链重推导 ≈2.1–2.7 ms/次（三次实测区间；`scripts/attack-family.mjs`、`scripts/regime-cost.mjs`） |
 | — | **Tenderly 公开验证** | 6 个合约源码级 public 验证（vault/receipt/gate/三注册表），合约页与 E2E tx **匿名可开**（见「Tenderly 公开证据」） |
 
@@ -220,7 +221,7 @@ node orchestrator/server.mjs
 # 目标草稿: POST /api/objective/draft  body: {"command":"buy WMON 0.01","marketData":"..."}
 
 # 口径一致性（改 normalize/护栏/PACE/目标层后必跑）
-node scripts/parity-check.mjs                 # proposer 预览 vs challenger 重推导，漂移即 exit 1（17 用例）
+node scripts/parity-check.mjs                 # proposer 预览 vs challenger 重推导，漂移即 exit 1（21 用例：14 护栏/PACE + 7 目标层）
 node scripts/d6-negative.mjs                  # 8 项攻击向量 + 1 正例对照（真实上链 fresh 合约，~0.15 MON gas）
 
 # 统一入口 Dashboard（评审从这里看）
@@ -243,9 +244,13 @@ cd ../dashboard && npm install && npm run build && npm start
 
 ## Challenger 独立性（2-of-2 的"2"从哪来）
 
-- **零共享代码**：challenger 自持策略与 5 层重推导（L1–L4 确定性重推 + L5 目标层验签/ε-算术，全部零 LLM 依赖），
-  与 proposer 无任何共享模块；代价是口径漂移风险，由 `scripts/parity-check.mjs` 守住
-  （同批输入喂两侧，"拒/放"结论不一致即失败；含 7 个目标层用例）
+- **零共享代码（方向说明）**：challenger 侧严格成立——`challenger/` 是自包含目录，自持策略 JSON、独立钱包、
+  独立 5 层实现（L1–L4 确定性重推 + L5 目标层验签/ε-算术，全部零 LLM 依赖），**不 import proposer 的任何模块**。
+  反向不成立：`orchestrator/server.mjs` 为复用裁决逻辑而 import 了 `challenger/verify.mjs` 的
+  `verifyDecision`/`attestedGuardrailHash`（dry-run 预览走这份代码）。因此 `scripts/parity-check.mjs` 的覆盖方向是
+  **proposer 预览 → challenger 裁决**，challenger 单方面改口径不会被该守卫检出；生产 `execute=true` 路径的护栏判定
+  用的是 `server.mjs` 自持的 `INJECTION_PATTERNS`（5 条，与 challenger 逐条一致，改动需两侧同步）。
+  守卫覆盖：14 个护栏/PACE 用例 + 7 个目标层用例，同批输入喂两侧，"拒/放"结论不一致即失败（漂移即 exit 1）
 - **交叉模型层（可选，默认关闭）**：challenger 可另配一个与 proposer 不同家族的模型独立提议
   （`llm-challenge.mjs`，`MODEL_CHALLENGE=true` 开启）。**"不同模型名"不等于"不同后端"**——同一网关可能
   把不同名字路由到同一模型；2026-09-13 曾以 token 指纹探测确认当时两侧后端互斥（`scripts/probe-gateway.mjs`）。
@@ -264,7 +269,7 @@ SOA-lite 把用户的**目标**（而非动作）变成签署对象：用户对�
 
 - **draft-then-sign**：agent 起草目标草案（`POST /api/objective/draft`）→ 用户在**自己设备上**审阅并签名
   （`scripts/soa-sign.mjs`；真实部署中用户私钥不离开用户设备）→ 目标随决策一起提交
-- **判据仍是确定性的**：验签 + 区间算术，任何人可复现；与 proposer 零共享代码的独立实现在 `challenger/objective.mjs`
+- **判据仍是确定性的**：验签 + 区间算术，任何人可复现；challenger 侧独立实现在 `challenger/objective.mjs`（不 import `tee-runtime/objective.mjs`）
 - **链上证据**：`objectiveHash` 经 `ReceiptRegistry.bindTranscript` 的 uri 字段上链
   （`aegis://objective/<hash>`），决策收据可溯到用户签署的目标
 - **拒绝语义**：`objective_bad_signature`（字段被篡改）/ `objective_expired`（期限已过）/

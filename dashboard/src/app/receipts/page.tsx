@@ -32,6 +32,7 @@ export default function ReceiptsPage() {
     [L("区块高度", "Block height"), String(r.blockHeight)],
     [L("执行动作", "Action"), r.action],
     [L("金额", "Amount"), r.amount ?? "—"],
+    [L("执行哈希", "Execution hash"), r.executionHash],
     [L("nonce", "nonce"), r.nonce],
     [L("护栏哈希", "Guardrail hash"), r.guardrailHash],
     [L("前序收据", "Prev receipt"), r.prevReceiptHash],
@@ -39,11 +40,14 @@ export default function ReceiptsPage() {
     [L("交易哈希", "Tx hash"), r.txHash ?? "—"],
   ];
 
+  // DCAP 面板只展示"本页真的读到了什么"。FMSPC / TCB Level / Quote 版本属于
+  // quote 工件内部字段，前端没有解析能力（也不该假装有），一律显示"未解析"，
+  // 真值请用 scripts/verify-quote.mjs 复验原始 quote。
   const dcap: [string, string][] = [
-    [L("Quote 类型", "Quote type"), "TDX v4"],
-    ["FMSPC", "20A06F"],
-    ["TCB Status", "OK"],
-    ["report_data[0:32]", shortHash(r.receiptHash)],
+    [L("Quote 类型", "Quote type"), L("未解析（见 verifier）", "not parsed (see verifier)")],
+    ["FMSPC", L("未解析（见 verifier）", "not parsed (see verifier)")],
+    ["TCB Status", L("未解析（见 verifier）", "not parsed (see verifier)")],
+    [L("收据摘要", "Receipt digest"), shortHash(r.receiptHash)],
   ];
 
   return (
@@ -116,8 +120,8 @@ export default function ReceiptsPage() {
           ) : null}
           <div className="mt-3 text-[11px] text-tertiary">
             {L(
-              "「—」表示索引器未覆盖的字段；真实值以区块浏览器为准，不要信本页的任何数字。",
-              "\"—\" means the indexer didn't capture that field; treat the block explorer as authoritative, not this page."
+              "哈希字段由浏览器直接读链上 ReceiptSubmitted 事件（最近若干块窗口）；「—」表示该字段不在当前数据来源里，请以区块浏览器为准。本页不显示任何推算值。",
+              "Hash fields are read in-browser directly from the on-chain ReceiptSubmitted event (recent block window). \"—\" means the field is absent from the current source; treat the block explorer as authoritative. This page never shows imputed values."
             )}
           </div>
         </div>

@@ -55,6 +55,11 @@ const LATEST_RECEIPT_ABI = {
   ],
 } as const;
 
+// 交易槽：字段与 latestReceipt 同构（合约里都是同一个 Receipt 结构），
+// 唯一的差别是这个 mapping 只由非心跳收据写入。名字不同但 ABI 可以复用，
+// viem 的 functionName 是字面量类型，故单独声明一份而不是复用上面的常量。
+const TRADE_RECEIPT_ABI = { ...LATEST_RECEIPT_ABI, name: "lastTradeReceipt" } as const;
+
 const RECEIPT_EVENT = parseAbiItem(
   "event ReceiptSubmitted(uint256 indexed agentId, bytes32 receiptHash, uint256 blockHeight, bool isHeartbeat)"
 );
@@ -166,20 +171,42 @@ export async function verifyLatest(agentId: bigint): Promise<VerifyCheck[]> {
   const guardrailHash = rec[2] as Hex;
   const blockHeight = rec[4] as bigint;
   const blockHash = rec[5] as Hex;
+  const isHeartbeat = rec[9] as boolean;
 
-  // 1) 新鲜度
+  // 1) 新鲜度：读交易槽 lastTradeReceipt，而不是 latestReceipt。
+  // latestReceipt 对心跳同样写入（ReceiptRegistry.sol），若拿它算新鲜度，
+  // 一条心跳占住链头就会让"交易是否在有效窗口内"这个判断失真。
+  // 合约的 isTradeFresh() 读的正是交易槽，与 _preExecutionHook 放行依据同源。
   try {
+    const tradeFresh = (await client.readContract({
+      address: ADDR.registry,
+      abi: [{ name: "isTradeFresh", type: "function", stateMutability: "view", inputs: [{ type: "uint256" }], outputs: [{ type: "bool" }] }],
+      functionName: "isTradeFresh",
+      args: [agentId],
+    })) as boolean;
+    const trade = (await client.readContract({
+      address: ADDR.registry,
+      abi: [TRADE_RECEIPT_ABI],
+      functionName: "lastTradeReceipt",
+      args: [agentId],
+    })) as readonly unknown[];
+    const tradeBlock = trade[4] as bigint;
     const current = await client.getBlockNumber();
-    const delta = current - blockHeight;
+    // 两侧都是 bigint：先比较再相减，避免把 uint256 塞进 Number 丢精度（区块高度远超 2^53 时才发生，
+    // 但这种转换一旦写进新鲜度判据就属于"看起来对、边界悄悄错"的那类）。
+    const delta = tradeBlock === 0n ? null : current - tradeBlock;
     push({
       key: "freshness",
-      labelZh: "新鲜度检查",
-      labelEn: "Freshness",
-      detail: `block.number − blockHeight = ${delta} (≤ ${MAX_BLOCK_AGE})`,
-      state: delta <= MAX_BLOCK_AGE ? "pass" : "fail",
+      labelZh: "交易新鲜度检查",
+      labelEn: "Trade freshness",
+      detail:
+        tradeBlock === 0n
+          ? "该 agent 尚无交易收据"
+          : `block.number − lastTradeReceipt.blockHeight = ${delta} (≤ ${MAX_BLOCK_AGE})${isHeartbeat ? "（链头是心跳，本项读交易槽）" : ""}`,
+      state: tradeBlock === 0n ? "pending" : tradeFresh ? "pass" : "fail",
     });
   } catch {
-    push({ key: "freshness", labelZh: "新鲜度检查", labelEn: "Freshness", detail: "读取区块高度失败", state: "pending" });
+    push({ key: "freshness", labelZh: "交易新鲜度检查", labelEn: "Trade freshness", detail: "读取区块高度失败", state: "pending" });
   }
 
   // 2) 区块哈希绑定
