@@ -6,8 +6,9 @@
 >
 > 诚实前提：默认路径**单工作站零 gas**（离线 harness）；链上与 live LLM 项为可选档，见 §4/§5。
 
-**固定 commit（Available 徽章锚点）**：`2bd982c34418e228c208162a2e4fdfc9dec89fd6`，
-tag `artifact-anon-2026-09-17`。本目录树即该 tag 的内容，故本文件中的相对路径可直接对照。
+**固定 commit（Available 徽章锚点）**：tag `artifact-anon-2026-09-17`，本目录树即该 tag 的内容，
+故本文件中的相对路径可直接对照。固定 commit sha 请以 tag 解析为准（`git rev-parse artifact-anon-2026-09-17`）——
+**论文引用写仓库 URL + tag 名，不写裸 sha**。
 仓库地址见论文 artifact 章节给出的匿名镜像链接；**本文件的提交身份为中性占位符
 `aegis-dev <aegis@local>`**，不包含任何作者身份信息。
 
