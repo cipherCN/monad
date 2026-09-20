@@ -8,7 +8,7 @@ import {IReceiptRegistry} from "./interfaces/IReceiptRegistry.sol";
 ///         交易必须：①来自 TEE 派生地址 ②被最新交易收据的 executionHash 背书
 ///         ③通过白名单/限额 ④Agent 存活（有新鲜收据）。提现永不冻结。
 contract AegisVault {
-    IReceiptRegistry public immutable registry;
+    IReceiptRegistry public registry;
     uint256 public immutable agentId;
 
     address public owner;
@@ -35,6 +35,7 @@ contract AegisVault {
     event TargetWhitelisted(address indexed target, bool allowed);
     event LimitsUpdated(uint256 perTxLimit, uint256 dailyLimit);
     event TEEUpdated(address indexed tee);
+    event ReceiptRegistryUpdated(address indexed previous, address indexed current);
     event Deposited(address indexed by, uint256 amount);
     event Withdrawn(address indexed by, uint256 amount);
     event OwnershipTransferStarted(address indexed from, address indexed to);
@@ -61,6 +62,7 @@ contract AegisVault {
         require(_registry != address(0) && _tee != address(0) && _owner != address(0), "Zero addr");
         registry = IReceiptRegistry(_registry);
         agentId = _agentId;
+        emit ReceiptRegistryUpdated(address(0), _registry);
         teeDerivedAddress = _tee;
         owner = _owner;
         // 不维护 lastProofBlock：存活判断完全委托给 registry.isAlive，
@@ -168,6 +170,19 @@ contract AegisVault {
         require(_tee != address(0), "Zero addr");
         teeDerivedAddress = _tee;
         emit TEEUpdated(_tee);
+    }
+
+    /// @notice 更换收据注册表。金库持有的资金不受影响，无需迁移。
+    /// @dev 刻意做成可变：registry 退出时（如升级 bindTranscript 公式、修 God mode）
+    ///      改这一处即可，否则资金要么永久困在旧金库、要么被迫 withdraw→redeploy，
+    ///      后者会让金库地址、白名单、限额、余额历史全部作废。
+    ///      信任模型不变——registry 本来就被信任（只有它背书的 executionHash 能放行执行）。
+    ///      调用方需保证新 registry 的 agentId 槽位已按同一策略完成 setup
+    ///      （authorizeTEE / setGuardrailHash），否则 executeTrade 会 fail-closed 全 revert。
+    function setReceiptRegistry(address _registry) external onlyOwner {
+        require(_registry != address(0), "Zero addr");
+        emit ReceiptRegistryUpdated(address(registry), _registry);
+        registry = IReceiptRegistry(_registry);
     }
 
     function startOwnershipTransfer(address newOwner) external onlyOwner {

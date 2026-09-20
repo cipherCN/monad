@@ -6,50 +6,76 @@ import { getReceiptViews } from "./chain";
 import type { Receipt } from "./mock";
 
 /**
- * 收据数据走统一入口：orchestrator 的 /api/receipts（索引器产物，真实链上哈希 + tx 哈希）。
- * 浏览器内不再扫 getLogs —— Monad 的 eth_getLogs 严格限 100 块，浏览器分窗扫描每个
- * 窗口都会失败，旧实现会静默回退到 mock（假哈希假金额）。orchestrator 不可达时返回
- * 空列表，由页面显示"离线"，绝不回退到看起来像真数据的占位值。
- *
- * 两级来源：
+ * 两级来源（都是真实链上读数，绝不回退 mock）：
  *   ① 浏览器内直读 ReceiptSubmitted 富事件（getReceiptViews）——executionHash/nonce/
- *      guardrailHash 都是事件里带的真值，用于展示哈希链；只覆盖最近若干块窗口。
- *   ② orchestrator 索引器（/api/receipts）——覆盖深历史，但只带 4 个字段。
- * ① 命中就用 ①（字段更全），否则退回 ②；两者都拿不到才显示离线。
+ *      guardrailHash 是事件里带的真值，字段最全；但只看最近 4000 块（40×100），
+ *      这段时间没有收据时它合法地返回空。全部 getLogs 都成功时也不会提前退出，
+ *      40 个窗口串行实测约 30s。
+ *   ② orchestrator 索引器（/api/receipts）——覆盖深历史，但只带 4 个字段；实测 ~22ms。
+ *
+ * 两条路并发跑，不能让 ① 的慢挡住 ②：
+ *   - ② 先回来就先把 4 字段的收据画出来，页面不再出现"有数据却报离线"的假象；
+ *   - ① 若随后在窗口内命中，则用字段更全的结果替换（升级视图）。
+ * 只把"还在查"（loading）与"两条路都空"（offline）分开：前者页面显示加载态，
+ * 后者才是真的离线。空结果本身不代表离线 —— 它可能只是窗口内没有收据。
  */
-export function useReceipts(agentId = 1): { receipts: Receipt[]; live: boolean } {
+export interface ReceiptsState {
+  receipts: Receipt[];
+  live: boolean;
+  /** 仍在取数且尚无任何结果时为 true —— 页面据此显示加载态，而非"离线" */
+  loading: boolean;
+}
+
+export function useReceipts(agentId = 1): ReceiptsState {
   const [receipts, setReceipts] = useState<Receipt[]>([]);
   const [live, setLive] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let alive = true;
-    (async () => {
-      // ① 浏览器直读：字段最全（含 executionHash / nonce / guardrailHash）
+    setReceipts([]);
+    setLive(false);
+    setLoading(true);
+
+    // ① 字段最全但慢（窗口扫描）。命中即替换 ② 的粗粒度结果。
+    const rich = (async (): Promise<Receipt[] | null> => {
       try {
-        const rich = await getReceiptViews(BigInt(agentId));
-        if (!alive) return;
-        if (rich.length) {
-          setReceipts(rich);
-          setLive(true);
-          return;
-        }
+        const rows = await getReceiptViews(BigInt(agentId));
+        return rows.length ? rows : null;
       } catch {
-        // 落到 ②
-      }
-      // ② orchestrator 索引器：深历史，字段较少
-      const r = await api.receipts(agentId);
-      if (!alive) return;
-      if (r && r.length) {
-        setReceipts(r.map(toView));
-        setLive(true);
+        return null;
       }
     })();
+
+    // ② 快（索引器），先画。
+    const fast = (async (): Promise<Receipt[] | null> => {
+      const r = await api.receipts(agentId);
+      return r && r.length ? r.map(toView) : null;
+    })();
+
+    (async () => {
+      const fastRows = await fast;
+      if (!alive) return;
+      if (fastRows) {
+        setReceipts(fastRows);
+        setLive(true);
+        setLoading(false);
+      }
+      const richRows = await rich;
+      if (!alive) return;
+      if (richRows) {
+        setReceipts(richRows);
+        setLive(true);
+      }
+      setLoading(false);
+    })();
+
     return () => {
       alive = false;
     };
   }, [agentId]);
 
-  return { receipts, live };
+  return { receipts, live, loading };
 }
 
 function toView(c: ChainReceipt): Receipt {

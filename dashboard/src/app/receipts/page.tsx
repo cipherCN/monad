@@ -9,11 +9,27 @@ import { CheckCircle2, Lock, Radio } from "lucide-react";
 
 export default function ReceiptsPage() {
   const L = useL();
-  const { receipts, live } = useReceipts(1);
+  const { receipts, live, loading } = useReceipts(1);
   const [selectedHash, setSelectedHash] = useState<string | null>(null);
   const r = receipts.find((x) => x.receiptHash === selectedHash) ?? receipts[0];
 
   if (!r) {
+    // 还在取数 ≠ 离线。富事件路径要串行扫 40 个 100 块的窗口（实测 ~30s），
+    // 此前这里在等待期间就直接显示"离线"，把"正在查"误报成"系统没在工作"。
+    if (loading) {
+      return (
+        <div className="card flex flex-col items-center gap-2 p-10 text-center">
+          <Radio className="h-5 w-5 animate-pulse text-cyan" />
+          <div className="text-sm text-secondary">{L("正在读取链上收据…", "Loading on-chain receipts…")}</div>
+          <div className="max-w-md text-xs text-tertiary">
+            {L(
+              "浏览器直读最近若干块窗口，同时向 orchestrator 索引器取历史。窗口内没有收据时这里会继续等待索引器结果。",
+              "Reading recent block windows in-browser while the orchestrator indexer serves history. If the window holds no receipts, this waits on the indexer."
+            )}
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="card flex flex-col items-center gap-2 p-10 text-center">
         <Radio className="h-5 w-5 text-muted" />

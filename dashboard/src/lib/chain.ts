@@ -29,7 +29,7 @@ export const ADDR = {
     "0xAe58a4F6DD3E2810812193D4766f11d5F3Dfc66F") as `0x${string}`,
   verifier: "0x0eb496471d638173cdF35bE6b0e54FE035289F1f" as `0x${string}`,
   vaultQuorum: (process.env.NEXT_PUBLIC_QUORUM_VAULT ||
-    "0x07Be2FCdAA649F11177AaCCbd68A5bFF36aB65bc") as `0x${string}`,
+    "0x3aBbb284760dce5643A8a5D1bA2bb9A58C2b89De") as `0x${string}`,
 } as const;
 
 // 与 ReceiptRegistry.MAX_BLOCK_AGE 保持一致（合约常量，改合约需同步这里）
@@ -301,15 +301,22 @@ const RICH_EVENT = parseAbiItem(
   "event ReceiptSubmitted(uint256 indexed agentId, bytes32 indexed receiptHash, uint256 blockHeight, bytes32 executionHash, bytes32 pdrHash, bytes32 guardrailHash, bytes32 nonce, bytes32 quoteHash, bool isHeartbeat)"
 );
 
-/** 从链上富化事件重建收据流（分窗口查询规避 getLogs 范围限制） */
+/**
+ * 从链上富化事件重建收据流（分窗口查询规避 getLogs 范围限制）。
+ *
+ * ⚠️ 窗口必须 ≤ 100 块：Monad 的 eth_getLogs 硬限 100 块窗口，超出直接返回
+ * 「413 Request Entity Too Large」（实测 6/6 全败）。旧值 window=5000n 让本函数
+ * 永远返回空，收据详情页的 executionHash/nonce/guardrailHash 因此恒为「—」。
+ * 40×100 = 4000 块 ≈ 13 分钟（出块 300ms），足以覆盖最近一次真实决策。
+ */
 export async function getReceiptViews(
   agentId: bigint,
-  windows = 6,
-  window = 5000n
+  windows = 40,
+  window = 100n
 ): Promise<Receipt[]> {
   try {
     const latest = await client.getBlockNumber();
-    let logs: { args: unknown }[] = [];
+    let logs: { args: unknown; transactionHash: Hex }[] = [];
     for (let i = 0; i < windows; i++) {
       const to = latest - BigInt(i) * window;
       if (to <= 0n) break;
@@ -347,10 +354,13 @@ export async function getReceiptViews(
           executionHash: a.executionHash,
           nonce: a.nonce,
           guardrailHash: a.guardrailHash,
+          // 链上不存 prev（ReceiptRegistry._submit 里 prev 只参与 digest 计算，不入 Receipt 结构体），
+          // 反推需假定窗口内收据连续，而索引已知有缺口 → 会产出假值，故恒为「—」。
           prevReceiptHash: "—",
           receiptHash: a.receiptHash,
           isHeartbeat: a.isHeartbeat,
           timestamp: Date.now(),
+          txHash: l.transactionHash,
         };
       })
       .reverse();
