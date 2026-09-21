@@ -29,9 +29,9 @@ The short version:
 ```bash
 cd aegis
 npm ci                             # lockfile is committed; .npmrc pins legacy-peer-deps
-npx hardhat test                   # 41 passing, no gas
+npx hardhat test                   # 44 passing, no gas
 node challenger/selftest.mjs       # 17 pass / 0 fail
-node scripts/parity-check.mjs      # 17 agree / 0 diverge
+node scripts/parity-check.mjs      # 21 agree / 0 diverge
 node scripts/attack-family.mjs     # 7/8 blocked; 8 as-expected / 0 unexpected
 node scripts/atomic-input.mjs      # ALL REGIMES PASS (4/4)
 node scripts/tee-adversary-sim.mjs # ALL LEGS PASS
