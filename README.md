@@ -87,9 +87,14 @@ reproduce the paper's results and some of which contain non-public context.
 ## Provenance
 
 The tree here corresponds to the paper's frozen artifact revision. The tag
-`artifact-anon-2026-09-17` marks the exact revision referenced by the paper;
+`artifact-anon-2026-09-21` marks the exact revision referenced by the paper;
 `main` points at the same commit. All commits are authored by the neutral
 placeholder `aegis-dev <aegis@local>`.
+
+Two earlier tags are superseded and must not be cited: `artifact-anon-2026-09-17`
+and `artifact-anon-2026-09-18` predate the current contract deployment and the
+dashboard revision, and their reproduction harness does not pass as documented.
+Citing them yields a tree that is not the one described in this README.
 
 ## License
 
