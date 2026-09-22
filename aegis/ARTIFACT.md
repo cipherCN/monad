@@ -10,11 +10,11 @@
 `https://github.com/<anonymous-artifact-mirror>`，tag **`artifact-anon-2026-09-21`**。
 **引用一律写仓库 URL + tag 名，不写裸 sha**（tag 曾因文档修正重打过，裸 sha 会漂；
 固定 sha 以 tag 解析为准：`git rev-parse artifact-anon-2026-09-21`）。该仓库提交身份全为中性占位符
-`aegis-dev <aegis@local>`。镜像内 `aegis/ARTIFACT.md` 即本文件的对等版本（内容一致，仅锚点段不同）。
+`aegis-dev <aegis@local>`。公开镜像内 `aegis/ARTIFACT.md` 即本文件的对等版本（内容一致，仅裸 URL 被替换为占位符）。
 
-> **旧 tag 说明**：`artifact-anon-2026-09-17` / `artifact-anon-2026-09-18` 为历史版本，分别早于
-> v5 金库重部署与 in-TEE CVM E2E 证据同步——**其中的文档指向已废弃的 v4 金库地址、合约源码不含
-> v5 的 `setReceiptRegistry`**。复现请一律使用 `artifact-anon-2026-09-21`。
+> **旧 tag 说明**：`artifact-anon-2026-09-17` 为历史版本，早于 v5 金库重部署与 in-TEE CVM E2E
+> 证据同步——**其中的文档指向已废弃的 v4 金库地址、合约源码不含 v5 的 `setReceiptRegistry`**。
+> 复现请一律使用 `artifact-anon-2026-09-21`。
 
 ## 0. 环境要求
 
